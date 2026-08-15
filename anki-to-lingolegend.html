@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anki → Lingo Legend Card Importer</title>
+  <link rel="stylesheet" href="google-font.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="wrap">
+    <header class="top">
+      <span class="tag-pill">.APKG → LINGO LEGEND CSV</span>
+      <h1>Anki Deck Importer</h1>
+      <p>Upload an Anki <code>.apkg</code> export, map its fields onto the Lingo Legend flash card template, and
+        download a ready-to-import CSV. Everything runs locally in your browser — nothing is uploaded anywhere.</p>
+    </header>
+
+    <div class="steps" id="stepsNav">
+      <div class="step-tab" data-step="0"><span class="n">1</span>Upload</div>
+      <div class="step-tab" data-step="1"><span class="n">2</span>Select</div>
+      <div class="step-tab" data-step="2"><span class="n">3</span>Map fields</div>
+      <div class="step-tab" data-step="3"><span class="n">4</span>Topic details</div>
+      <div class="step-tab" data-step="4"><span class="n">5</span>Export</div>
+    </div>
+
+    <!-- STEP 0: UPLOAD -->
+    <section id="step0">
+      <div class="card">
+        <h2>1. Upload your Anki export</h2>
+        <p class="hint">In Anki: <em>File → Export…</em>, choose “Anki Deck Package (.apkg)”. Include scheduling
+          information or not — it doesn't matter, only the card content is used.</p>
+        <div class="dropzone" id="dropzone">
+          <strong>Drop your .apkg file here, or click to choose one</strong>
+          <span>Nothing leaves your browser — parsing happens entirely on your device.</span>
+          <input type="file" id="fileInput" accept=".apkg">
+        </div>
+        <div id="uploadMsg"></div>
+      </div>
+    </section>
+
+    <!-- STEP 1: SELECT -->
+    <section id="step1" hidden>
+      <div class="card">
+        <h2>2. Choose what to include</h2>
+        <p class="hint">Uncheck any note types or decks you don't want exported.</p>
+        <p style="font-weight:600; font-size:13.6px; margin:16px 0 8px;">Note types found</p>
+        <div class="checklist" id="modelChecklist"></div>
+        <p style="font-weight:600; font-size:13.6px; margin:18px 0 8px;">Decks found</p>
+        <div class="checklist" id="deckChecklist"></div>
+        <p style="font-weight:600; font-size:13.6px; margin:18px 0 8px;">Tags found <span
+            style="font-weight:400; color:var(--muted);">— available as a mapping source in the next step</span></p>
+        <div id="tagChips" class="tag-chips"></div>
+        <div class="stat-row" id="selectStats"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" data-back>← Back</button>
+        <button class="btn btn-primary" data-next id="toMapBtn">Continue to field mapping →</button>
+      </div>
+    </section>
+
+    <!-- STEP 2: MAP FIELDS -->
+    <section id="step2" hidden>
+      <div class="card">
+        <h2>3. Map Anki fields to Lingo Legend columns</h2>
+        <p class="hint">Each note type gets its own mapping, since field names can differ. We've guessed some matches —
+          check them over. Fields marked <span style="color:var(--margin)">*</span> are required by the template.</p>
+        <div id="mappingHost"></div>
+      </div>
+      <div class="card">
+        <h2>Text cleanup</h2>
+        <div class="toggle-row">
+          <input type="checkbox" id="optClean" checked>
+          <div>
+            <div class="t-label">Clean Anki formatting</div>
+            <div class="t-desc">Strips HTML tags, [sound:…] references, LaTeX/cloze markup, and decodes HTML entities
+              before export.</div>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <input type="checkbox" id="optFurigana">
+          <div>
+            <div class="t-label">Extract furigana readings</div>
+            <div class="t-desc">If a field uses the Anki Japanese-support format <code>漢字[かんじ]</code>, split the
+              bracketed reading out into <em>Pronunciation Override</em> (only for columns left unmapped) and leave
+              plain text behind.</div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" data-back>← Back</button>
+        <button class="btn btn-primary" data-next>Continue to topic details →</button>
+      </div>
+    </section>
+
+    <!-- STEP 3: TOPIC DETAILS -->
+    <section id="step3" hidden>
+      <div class="card">
+        <h2>4. Topic details</h2>
+        <p class="hint">The template only fills in Description &amp; Type on the first row of each topic. Add them here
+          once per topic — optional.</p>
+        <div style="overflow:auto;">
+          <table class="topics-table" id="topicsTable">
+            <thead>
+              <tr>
+                <th>Topic name</th>
+                <th>Description (optional)</th>
+                <th>Type (optional)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <datalist id="topicTypeSuggestions">
+          <option value="0 - Vocab">
+          <option value="2 - Phrases">
+        </datalist>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" data-back>← Back</button>
+        <button class="btn btn-primary" data-next>Continue to export →</button>
+      </div>
+    </section>
+
+    <!-- STEP 4: EXPORT -->
+    <section id="step4" hidden>
+      <div class="card">
+        <h2>5. Preview &amp; export</h2>
+        <div class="stat-row" id="exportStats"></div>
+        <div class="preview-wrap">
+          <table class="preview" id="previewTable"></table>
+        </div>
+        <p class="hint" style="margin-top:14px;">Showing the first 50 rows. The full file will include every row.</p>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" data-back>← Back</button>
+        <button class="btn btn-primary" id="downloadBtn">⬇ Download Lingo Legend CSV</button>
+      </div>
+    </section>
+
+    <footer class="credit">Runs fully client-side. Nothing about your deck is sent anywhere.</footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.5.0/sql-wasm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fzstd@0.1.1/umd/index.js"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>
