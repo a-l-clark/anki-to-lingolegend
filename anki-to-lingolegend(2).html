@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anki → Lingo Legend Card Importer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F1E3;
+    --card:#FFFFFF;
+    --ink:#211E18;
+    --muted:#736B5A;
+    --rule:#C9D3E4;
+    --margin:#BE5C50;
+    --accent:#2E6E63;
+    --accent-dark:#204F47;
+    --accent-soft:#E4EEEB;
+    --danger:#A63E33;
+    --danger-soft:#FBEAE7;
+    --radius:3px;
+    --shadow: 0 1px 2px rgba(33,25,15,.08), 0 8px 20px rgba(33,25,15,.07);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif; font-size:15px; line-height:1.5;
+    background-image:
+      radial-gradient(circle at 15% 8%, rgba(190,92,80,.05), transparent 40%),
+      radial-gradient(circle at 85% 92%, rgba(46,110,99,.06), transparent 40%);
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:36px 20px 90px;}
+  header.top{margin-bottom:28px;}
+  header.top h1{
+    font-family:'Lora',serif; font-weight:600; font-size:30px; margin:0 0 6px;
+    letter-spacing:.2px;
+  }
+  header.top p{margin:0; color:var(--muted); max-width:60ch;}
+  .tag-pill{
+    display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    letter-spacing:.03em; color:var(--accent-dark); background:var(--accent-soft);
+    padding:3px 8px; border-radius:20px; margin-bottom:12px;
+  }
+
+  /* step tracker — a fan of little index cards */
+  .steps{display:flex; gap:6px; margin-bottom:26px; flex-wrap:wrap;}
+  .step-tab{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);
+    background:#EFE8D6; border:1px solid #DFD5BC; border-bottom:none;
+    padding:9px 14px 8px; border-radius:5px 5px 0 0; cursor:default;
+    transform:translateY(4px); transition:transform .15s ease, color .15s ease, background .15s ease;
+    user-select:none;
+  }
+  .step-tab .n{color:var(--margin); margin-right:6px;}
+  .step-tab.active{
+    background:var(--card); color:var(--ink); transform:translateY(0);
+    border-color:#DFD5BC; box-shadow:0 -2px 0 var(--accent) inset;
+    font-weight:600;
+  }
+  .step-tab.done{color:var(--accent-dark); cursor:pointer;}
+  .step-tab.done:hover{transform:translateY(1px);}
+
+  .card{
+    background-color:var(--card);
+    background-image: repeating-linear-gradient(to bottom, transparent 0 30px, var(--rule) 31px, transparent 32px);
+    border-left:3px solid var(--margin);
+    border-radius:0 var(--radius) var(--radius) 0;
+    box-shadow:var(--shadow);
+    padding:26px 26px 26px 30px;
+    margin-bottom:20px;
+  }
+  .card h2{
+    font-family:'Lora',serif; font-size:19px; font-weight:600; margin:0 0 4px;
+  }
+  .card .hint{color:var(--muted); font-size:13.5px; margin:0 0 18px;}
+  section[hidden]{display:none;}
+
+  .dropzone{
+    border:2px dashed #CBB994; border-radius:6px; padding:34px 20px; text-align:center;
+    background:#FCFAF3; cursor:pointer; transition:border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--accent); background:var(--accent-soft);}
+  .dropzone strong{display:block; font-size:15.5px; margin-bottom:4px;}
+  .dropzone span{color:var(--muted); font-size:13px;}
+  input[type=file]{display:none;}
+
+  .btn{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:14px; cursor:pointer;
+    border:none; border-radius:5px; padding:10px 18px; display:inline-flex; align-items:center; gap:8px;
+    transition:transform .08s ease, background .15s ease;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--accent); color:#fff;}
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-primary:disabled{background:#C8C1AF; cursor:not-allowed;}
+  .btn-ghost{background:transparent; color:var(--accent-dark); border:1px solid #CBB994;}
+  .btn-ghost:hover{background:#F1E9D3;}
+  .btn-row{display:flex; justify-content:space-between; margin-top:22px; gap:10px;}
+
+  table.map-table{width:100%; border-collapse:collapse; font-size:13.6px;}
+  table.map-table th{
+    text-align:left; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.03em;
+    color:var(--muted); font-weight:500; padding:6px 8px; border-bottom:1px solid #E7DEC7;
+  }
+  table.map-table td{padding:7px 8px; border-bottom:1px solid #F0EADA; vertical-align:middle;}
+  table.map-table td.label{white-space:nowrap;}
+  table.map-table td.label .req{color:var(--margin); margin-left:3px;}
+  select, input[type=text]{
+    font-family:'Inter',sans-serif; font-size:13.6px; padding:6px 8px; border-radius:4px;
+    border:1px solid #D3C9AE; background:#fff; color:var(--ink); width:100%;
+  }
+  select:focus, input[type=text]:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  .fixed-input{margin-top:5px;}
+
+  details.nt-block{margin-bottom:18px; border:1px solid #E7DEC7; border-radius:5px; overflow:hidden;}
+  details.nt-block summary{
+    cursor:pointer; padding:10px 14px; background:#FBF7EC; font-weight:600; font-size:14px;
+    list-style:none; display:flex; justify-content:space-between; align-items:center;
+  }
+  details.nt-block summary::-webkit-details-marker{display:none;}
+  details.nt-block summary .count{font-weight:400; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);}
+  details.nt-block .nt-body{padding:14px;}
+
+  .checklist{display:flex; flex-direction:column; gap:8px; max-height:260px; overflow:auto; padding-right:4px;}
+  .checklist label{
+    display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid #EDE6D2;
+    border-radius:5px; background:#FCFAF3; font-size:13.8px; cursor:pointer;
+  }
+  .checklist label:hover{border-color:#D3C9AE;}
+  .checklist .meta{margin-left:auto; color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:11.5px;}
+  .tag-chips{display:flex; flex-wrap:wrap; gap:6px;}
+  .tag-chips .chip{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; background:#FCFAF3; border:1px solid #EDE6D2;
+    border-radius:20px; padding:4px 10px; color:var(--accent-dark);
+  }
+  .tag-chips .chip .n{color:var(--muted); margin-left:5px;}
+  .tag-chips .none{color:var(--muted); font-size:13px; font-style:italic;}
+  input[type=checkbox]{width:16px; height:16px; accent-color:var(--accent);}
+
+  .toggle-row{display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid #F0EADA;}
+  .toggle-row:last-child{border-bottom:none;}
+  .toggle-row input{margin-top:3px;}
+  .toggle-row .t-label{font-weight:600; font-size:13.8px;}
+  .toggle-row .t-desc{color:var(--muted); font-size:12.8px; margin-top:1px;}
+
+  table.topics-table{width:100%; border-collapse:collapse; font-size:13.6px;}
+  table.topics-table th{
+    text-align:left; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted);
+    font-weight:500; padding:6px 8px; border-bottom:1px solid #E7DEC7;
+  }
+  table.topics-table td{padding:6px 8px; border-bottom:1px solid #F0EADA;}
+  table.topics-table td.name{font-weight:600; white-space:nowrap;}
+
+  .preview-wrap{overflow:auto; border:1px solid #E7DEC7; border-radius:5px; max-height:380px;}
+  table.preview{border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:12px; min-width:100%;}
+  table.preview th{
+    position:sticky; top:0; background:#2A2620; color:#F3EBD8; text-align:left; padding:7px 10px; white-space:nowrap;
+  }
+  table.preview td{padding:6px 10px; border-bottom:1px solid #EFE9D8; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis;}
+  table.preview tr:nth-child(even) td{background:#FBF8EF;}
+
+  .stat-row{display:flex; gap:18px; margin:14px 0 4px; flex-wrap:wrap;}
+  .stat{background:#FCFAF3; border:1px solid #EDE6D2; border-radius:5px; padding:10px 16px; min-width:120px;}
+  .stat .num{font-family:'Lora',serif; font-size:22px; font-weight:600; color:var(--accent-dark);}
+  .stat .lbl{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;}
+
+  .msg{padding:12px 14px; border-radius:5px; font-size:13.6px; margin-top:14px;}
+  .msg.error{background:var(--danger-soft); color:var(--danger); border:1px solid #ECC9C2;}
+  .msg.info{background:var(--accent-soft); color:var(--accent-dark); border:1px solid #C7DDD6;}
+  .spinner{
+    display:inline-block; width:15px; height:15px; border:2px solid #D3C9AE; border-top-color:var(--accent);
+    border-radius:50%; animation:spin .7s linear infinite; vertical-align:-3px; margin-right:8px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  footer.credit{text-align:center; color:var(--muted); font-size:12px; margin-top:26px;}
+  @media (max-width:640px){
+    table.map-table thead{display:none;}
+    table.map-table tr{display:block; padding:10px 0; border-bottom:1px solid #EFE7CF;}
+    table.map-table td{display:block; border:none; padding:4px 0;}
+    table.map-table td.label{font-weight:600;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="tag-pill">.APKG → LINGO LEGEND CSV</span>
+    <h1>Anki Deck Importer</h1>
+    <p>Upload an Anki <code>.apkg</code> export, map its fields onto the Lingo Legend flash card template, and download a ready-to-import CSV. Everything runs locally in your browser — nothing is uploaded anywhere.</p>
+  </header>
+
+  <div class="steps" id="stepsNav">
+    <div class="step-tab" data-step="0"><span class="n">1</span>Upload</div>
+    <div class="step-tab" data-step="1"><span class="n">2</span>Select</div>
+    <div class="step-tab" data-step="2"><span class="n">3</span>Map fields</div>
+    <div class="step-tab" data-step="3"><span class="n">4</span>Topic details</div>
+    <div class="step-tab" data-step="4"><span class="n">5</span>Export</div>
+  </div>
+
+  <!-- STEP 0: UPLOAD -->
+  <section id="step0">
+    <div class="card">
+      <h2>1. Upload your Anki export</h2>
+      <p class="hint">In Anki: <em>File → Export…</em>, choose “Anki Deck Package (.apkg)”. Include scheduling information or not — it doesn't matter, only the card content is used.</p>
+      <div class="dropzone" id="dropzone">
+        <strong>Drop your .apkg file here, or click to choose one</strong>
+        <span>Nothing leaves your browser — parsing happens entirely on your device.</span>
+        <input type="file" id="fileInput" accept=".apkg">
+      </div>
+      <div id="uploadMsg"></div>
+    </div>
+  </section>
+
+  <!-- STEP 1: SELECT -->
+  <section id="step1" hidden>
+    <div class="card">
+      <h2>2. Choose what to include</h2>
+      <p class="hint">Uncheck any note types or decks you don't want exported.</p>
+      <p style="font-weight:600; font-size:13.6px; margin:16px 0 8px;">Note types found</p>
+      <div class="checklist" id="modelChecklist"></div>
+      <p style="font-weight:600; font-size:13.6px; margin:18px 0 8px;">Decks found</p>
+      <div class="checklist" id="deckChecklist"></div>
+      <p style="font-weight:600; font-size:13.6px; margin:18px 0 8px;">Tags found <span style="font-weight:400; color:var(--muted);">— available as a mapping source in the next step</span></p>
+      <div id="tagChips" class="tag-chips"></div>
+      <div class="stat-row" id="selectStats"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-back>← Back</button>
+      <button class="btn btn-primary" data-next id="toMapBtn">Continue to field mapping →</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: MAP FIELDS -->
+  <section id="step2" hidden>
+    <div class="card">
+      <h2>3. Map Anki fields to Lingo Legend columns</h2>
+      <p class="hint">Each note type gets its own mapping, since field names can differ. We've guessed some matches — check them over. Fields marked <span style="color:var(--margin)">*</span> are required by the template.</p>
+      <div id="mappingHost"></div>
+    </div>
+    <div class="card">
+      <h2>Text cleanup</h2>
+      <div class="toggle-row">
+        <input type="checkbox" id="optClean" checked>
+        <div>
+          <div class="t-label">Clean Anki formatting</div>
+          <div class="t-desc">Strips HTML tags, [sound:…] references, LaTeX/cloze markup, and decodes HTML entities before export.</div>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <input type="checkbox" id="optFurigana">
+        <div>
+          <div class="t-label">Extract furigana readings</div>
+          <div class="t-desc">If a field uses the Anki Japanese-support format <code>漢字[かんじ]</code>, split the bracketed reading out into <em>Pronunciation Override</em> (only for columns left unmapped) and leave plain text behind.</div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-back>← Back</button>
+      <button class="btn btn-primary" data-next>Continue to topic details →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: TOPIC DETAILS -->
+  <section id="step3" hidden>
+    <div class="card">
+      <h2>4. Topic details</h2>
+      <p class="hint">The template only fills in Description &amp; Type on the first row of each topic. Add them here once per topic — optional.</p>
+      <div style="overflow:auto;">
+        <table class="topics-table" id="topicsTable">
+          <thead><tr><th>Topic name</th><th>Description (optional)</th><th>Type (optional)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-back>← Back</button>
+      <button class="btn btn-primary" data-next>Continue to export →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: EXPORT -->
+  <section id="step4" hidden>
+    <div class="card">
+      <h2>5. Preview &amp; export</h2>
+      <div class="stat-row" id="exportStats"></div>
+      <div class="preview-wrap">
+        <table class="preview" id="previewTable"></table>
+      </div>
+      <p class="hint" style="margin-top:14px;">Showing the first 50 rows. The full file will include every row.</p>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-back>← Back</button>
+      <button class="btn btn-primary" id="downloadBtn">⬇ Download Lingo Legend CSV</button>
+    </div>
+  </section>
+
+  <footer class="credit">Runs fully client-side. Nothing about your deck is sent anywhere.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.5.0/sql-wasm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fzstd@0.1.1/umd/index.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- constants ---------- */
+  var OUTPUT_COLUMNS = [
+    {key:'topicName',          label:'Topic Name',              required:true,  guess:['deck']},
+    {key:'topicDesc',          label:'Topic Description',       required:false, guess:[]},
+    {key:'topicType',          label:'Topic Type',              required:false, guess:[]},
+    {key:'nativeText',         label:'Native Text',             required:true,  guess:['front','word','term','expression','native','english','question']},
+    {key:'nativeContext',      label:'Native Context Line',     required:false, guess:['example (native)','native example','context','example sentence','example']},
+    {key:'translationText',    label:'Translation Text',        required:true,  guess:['back','answer','meaning','translation','target','definition']},
+    {key:'translationContext', label:'Translation Context Line',required:false, guess:['example (translation)','translated example','translation example']},
+    {key:'translationHint',    label:'Translation Hint',        required:false, guess:['hint','note','notes','mnemonic','tip']},
+    {key:'pronunciation',      label:'Pronunciation Override',  required:false, guess:['pronunciation','reading','furigana','phonetic','romaji','ipa']}
+  ];
+  var CSV_HEADER = "Topic Name (Required),Topic Description (Optional),Topic Type (Optional),Native Text (Required),Native Context Line (Optional),Translation Text (Required),Translation Context Line (Optional),Translation Hint (Optional),Pronunciation Override (Optional)";
+  var TOPIC_TYPES = ["0 - Vocab", "1 - Grammar", "2 - Phrases", "3 - Script", "4 - Misc"];
+
+  /* ---------- state ---------- */
+  var state = {
+    db:null,
+    models:{},      // id -> {id, name, fields:[names]}
+    decks:{},       // id -> {id, name}
+    notes:[],       // {id, mid, flds:[...], tags}
+    deckIdByNote:{}, // noteId -> deckId
+    selectedModels:{}, // mid -> bool
+    selectedDecks:{},  // did -> bool
+    mappings:{},    // mid -> { colKey: {type:'none'|'fixed'|'deck'|'tags'|'field', value, field} }
+    topicDetails:{},// topicName -> {desc, type}
+    rows:[],        // built export rows
+    csv:''
+  };
+  var currentStep = 0;
+
+  /* ---------- step navigation ---------- */
+  var steps = [0,1,2,3,4];
+  function showStep(i){
+    steps.forEach(function(s){ document.getElementById('step'+s).hidden = (s!==i); });
+    document.querySelectorAll('.step-tab').forEach(function(tab){
+      var s = parseInt(tab.dataset.step,10);
+      tab.classList.toggle('active', s===i);
+      tab.classList.toggle('done', s<i);
+    });
+    currentStep = i;
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  document.getElementById('stepsNav').addEventListener('click', function(e){
+    var tab = e.target.closest('.step-tab');
+    if (!tab) return;
+    var s = parseInt(tab.dataset.step,10);
+    if (s <= currentStep && document.getElementById('step0-parsed')) showStep(s);
+  });
+  document.querySelectorAll('[data-back]').forEach(function(b){
+    b.addEventListener('click', function(){ showStep(Math.max(0,currentStep-1)); });
+  });
+  document.querySelectorAll('[data-next]').forEach(function(b){
+    b.addEventListener('click', function(){ advanceFrom(currentStep); });
+  });
+
+  function advanceFrom(i){
+    if (i===1){ buildMappingUI(); showStep(2); return; }
+    if (i===2){ buildTopicsUI(); showStep(3); return; }
+    if (i===3){ buildPreview(); showStep(4); return; }
+    showStep(Math.min(4,i+1));
+  }
+
+  /* ---------- upload & parse ---------- */
+  var dropzone = document.getElementById('dropzone');
+  var fileInput = document.getElementById('fileInput');
+  dropzone.addEventListener('click', function(){ fileInput.click(); });
+  ['dragenter','dragover'].forEach(function(ev){
+    dropzone.addEventListener(ev, function(e){ e.preventDefault(); dropzone.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    dropzone.addEventListener(ev, function(e){ e.preventDefault(); dropzone.classList.remove('drag'); });
+  });
+  dropzone.addEventListener('drop', function(e){
+    var f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  fileInput.addEventListener('change', function(){
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function setUploadMsg(html, cls){
+    var el = document.getElementById('uploadMsg');
+    el.innerHTML = html ? ('<div class="msg '+(cls||'info')+'">'+html+'</div>') : '';
+  }
+
+  var sqlJsReady = null;
+  function getSqlJs(){
+    if (!sqlJsReady){
+      sqlJsReady = initSqlJs({ locateFile: function(f){ return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.5.0/'+f; } });
+    }
+    return sqlJsReady;
+  }
+
+  function handleFile(file){
+    if (!/\.apkg$/i.test(file.name)){
+      setUploadMsg('That doesn\'t look like a .apkg file. Export your deck from Anki as an "Anki Deck Package" first.', 'error');
+      return;
+    }
+    setUploadMsg('<span class="spinner"></span>Reading '+escapeHtml(file.name)+'…', 'info');
+    parseApkg(file).then(function(){
+      setUploadMsg('Loaded '+state.notes.length+' notes across '+Object.keys(state.models).length+' note type(s) and '+Object.keys(state.decks).length+' deck(s).', 'info');
+      document.getElementById('step0-parsed');
+      var marker = document.createElement('span'); marker.id='step0-parsed'; marker.style.display='none';
+      document.getElementById('step0').appendChild(marker);
+      buildSelectUI();
+      showStep(1);
+    }).catch(function(err){
+      console.error(err);
+      setUploadMsg('Couldn\'t read that file: '+escapeHtml(err.message||String(err)), 'error');
+    });
+  }
+
+  function parseApkg(file){
+    return file.arrayBuffer().then(function(buf){
+      return JSZip.loadAsync(buf);
+    }).then(function(zip){
+      var isZstd = false;
+      var entry = zip.file('collection.anki21') || zip.file('collection.anki2');
+      if (!entry){ entry = zip.file('collection.anki21b'); isZstd = true; }
+      if (!entry) throw new Error('No collection database found inside this .apkg (expected collection.anki2, .anki21, or .anki21b).');
+      return entry.async('uint8array').then(function(bytes){ return {bytes:bytes, isZstd:isZstd}; });
+    }).then(function(res){
+      var bytes = res.bytes;
+      if (res.isZstd){
+        if (!window.fzstd) throw new Error('This deck uses the newer compressed Anki format, and the decompression library didn\'t load (check your internet connection and reload the page).');
+        bytes = fzstd.decompress(bytes);
+      }
+      return getSqlJs().then(function(SQL){
+        state.db = new SQL.Database(bytes);
+        loadModelsAndDecks();
+        loadNotesAndCards();
+      });
+    });
+  }
+
+  function queryAll(sql){
+    var res = state.db.exec(sql);
+    if (!res.length) return [];
+    var cols = res[0].columns, vals = res[0].values;
+    return vals.map(function(row){
+      var o = {};
+      cols.forEach(function(c,i){ o[c]=row[i]; });
+      return o;
+    });
+  }
+
+  function normalizeModels(raw){
+    var out = {};
+    Object.keys(raw||{}).forEach(function(id){
+      var m = raw[id];
+      var flds = (m.flds||[]).slice().sort(function(a,b){ return (a.ord||0)-(b.ord||0); }).map(function(f){ return f.name; });
+      out[id] = {id:id, name:m.name, fields:flds};
+    });
+    return out;
+  }
+  function normalizeDecks(raw){
+    var out = {};
+    Object.keys(raw||{}).forEach(function(id){
+      var d = raw[id];
+      out[id] = {id:id, name:(d.name||'').split('::').join(' :: ')};
+    });
+    return out;
+  }
+
+  function loadModelsAndDecks(){
+    var models = {}, decks = {};
+    try{
+      var colRows = queryAll('SELECT models, decks FROM col');
+      if (colRows.length){
+        if (colRows[0].models) models = JSON.parse(colRows[0].models);
+        if (colRows[0].decks) decks = JSON.parse(colRows[0].decks);
+      }
+    }catch(e){ /* fall through to normalized tables */ }
+
+    if (!models || !Object.keys(models).length){
+      try{
+        var nt = queryAll('SELECT id, name FROM notetypes');
+        var flds = queryAll('SELECT ntid, name, ord FROM fields ORDER BY ntid, ord');
+        var byNt = {};
+        flds.forEach(function(f){
+          byNt[f.ntid] = byNt[f.ntid] || [];
+          byNt[f.ntid][f.ord] = f.name;
+        });
+        nt.forEach(function(m){
+          var fArr = (byNt[m.id]||[]).map(function(n,ord){ return {name:n, ord:ord}; }).filter(function(f){ return f.name!=null; });
+          models[m.id] = {name:m.name, flds:fArr};
+        });
+      }catch(e){ /* ignore */ }
+    }
+    if (!decks || !Object.keys(decks).length){
+      try{
+        var dRows = queryAll('SELECT id, name FROM decks');
+        dRows.forEach(function(d){ decks[d.id] = {name:d.name}; });
+      }catch(e){ /* ignore */ }
+    }
+
+    state.models = normalizeModels(models);
+    state.decks = normalizeDecks(decks);
+  }
+
+  function loadNotesAndCards(){
+    var noteRows = queryAll('SELECT id, mid, flds, tags FROM notes');
+    state.notes = noteRows.map(function(n){
+      var tagStr = (n.tags||'').trim();
+      var tagList = tagStr ? tagStr.split(/\s+/).filter(Boolean) : [];
+      return {id:n.id, mid:String(n.mid), flds:String(n.flds).split('\x1f'), tags:tagStr, tagList:tagList};
+    });
+    var cardRows = queryAll('SELECT nid, did FROM cards ORDER BY id');
+    var map = {};
+    cardRows.forEach(function(c){
+      if (map[c.nid]===undefined) map[c.nid]=String(c.did);
+    });
+    state.deckIdByNote = map;
+  }
+
+  /* ---------- step 1: select ---------- */
+  function buildSelectUI(){
+    // count notes per model, and which decks each model appears in
+    var modelStats = {}; // mid -> {count, decks:Set}
+    var deckStats = {};  // did -> count
+    state.notes.forEach(function(n){
+      var did = state.deckIdByNote[n.id];
+      modelStats[n.mid] = modelStats[n.mid] || {count:0, decks:{}};
+      modelStats[n.mid].count++;
+      if (did!=null) modelStats[n.mid].decks[did]=true;
+      if (did!=null) deckStats[did] = (deckStats[did]||0)+1;
+    });
+
+    var modelHost = document.getElementById('modelChecklist');
+    modelHost.innerHTML = '';
+    Object.keys(state.models).forEach(function(mid){
+      if (!modelStats[mid]) return; // model unused
+      state.selectedModels[mid] = true;
+      var m = state.models[mid];
+      var deckNames = Object.keys(modelStats[mid].decks).map(function(d){ return state.decks[d] ? state.decks[d].name : '?'; }).join(', ');
+      var label = document.createElement('label');
+      label.innerHTML = '<input type="checkbox" checked data-model="'+mid+'"> <span><strong>'+escapeHtml(m.name)+'</strong> — fields: '+escapeHtml(m.fields.join(', '))+'<br><span style="color:var(--muted); font-size:12px;">used in: '+escapeHtml(deckNames||'—')+'</span></span><span class="meta">'+modelStats[mid].count+' notes</span>';
+      modelHost.appendChild(label);
+    });
+    modelHost.addEventListener('change', function(e){
+      var cb = e.target.closest('input[data-model]');
+      if (!cb) return;
+      state.selectedModels[cb.dataset.model] = cb.checked;
+      updateSelectStats();
+    });
+
+    var deckHost = document.getElementById('deckChecklist');
+    deckHost.innerHTML = '';
+    Object.keys(deckStats).sort(function(a,b){ return deckStats[b]-deckStats[a]; }).forEach(function(did){
+      state.selectedDecks[did] = true;
+      var d = state.decks[did] || {name:'Unknown deck'};
+      var label = document.createElement('label');
+      label.innerHTML = '<input type="checkbox" checked data-deck="'+did+'"> <span><strong>'+escapeHtml(d.name)+'</strong></span><span class="meta">'+deckStats[did]+' notes</span>';
+      deckHost.appendChild(label);
+    });
+    deckHost.addEventListener('change', function(e){
+      var cb = e.target.closest('input[data-deck]');
+      if (!cb) return;
+      state.selectedDecks[cb.dataset.deck] = cb.checked;
+      updateSelectStats();
+    });
+
+    var tagCounts = {};
+    state.notes.forEach(function(n){
+      n.tagList.forEach(function(t){ tagCounts[t] = (tagCounts[t]||0)+1; });
+    });
+    var tagNames = Object.keys(tagCounts).sort(function(a,b){ return tagCounts[b]-tagCounts[a]; });
+    var chipHost = document.getElementById('tagChips');
+    if (!tagNames.length){
+      chipHost.innerHTML = '<span class="none">No tags found in this deck.</span>';
+    } else {
+      chipHost.innerHTML = tagNames.map(function(t){
+        return '<span class="chip">'+escapeHtml(t)+'<span class="n">'+tagCounts[t]+'</span></span>';
+      }).join('');
+    }
+
+    updateSelectStats();
+  }
+
+  function includedNotes(){
+    return state.notes.filter(function(n){
+      var did = state.deckIdByNote[n.id];
+      return state.selectedModels[n.mid] && state.selectedDecks[did];
+    });
+  }
+
+  function updateSelectStats(){
+    var n = includedNotes().length;
+    document.getElementById('selectStats').innerHTML =
+      '<div class="stat"><div class="num">'+n+'</div><div class="lbl">cards will be exported</div></div>';
+    document.getElementById('toMapBtn').disabled = n===0;
+  }
+
+  /* ---------- step 2: mapping ---------- */
+  function guessSource(fieldNames, guessKeywords){
+    var lower = fieldNames.map(function(f){ return f.toLowerCase(); });
+    for (var k=0;k<guessKeywords.length;k++){
+      var kw = guessKeywords[k];
+      var idx = lower.findIndex(function(f){ return f.indexOf(kw)>-1; });
+      if (idx>-1) return idx;
+    }
+    return -1;
+  }
+
+  function buildMappingUI(){
+    var host = document.getElementById('mappingHost');
+    host.innerHTML = '';
+    var activeModels = Object.keys(state.selectedModels).filter(function(m){ return state.selectedModels[m]; });
+
+    activeModels.forEach(function(mid){
+      var model = state.models[mid];
+      if (!model) return;
+      if (!state.mappings[mid]) state.mappings[mid] = {};
+      var modelTagSet = {};
+      state.notes.forEach(function(n){
+        if (n.mid===mid) n.tagList.forEach(function(t){ modelTagSet[t]=true; });
+      });
+      var modelTags = Object.keys(modelTagSet).sort();
+
+      var details = document.createElement('details');
+      details.className = 'nt-block';
+      details.open = activeModels.length<=2;
+      var count = state.notes.filter(function(n){ return n.mid===mid; }).length;
+      details.innerHTML = '<summary>'+escapeHtml(model.name)+' <span class="count">'+count+' notes · '+model.fields.length+' fields</span></summary>';
+      var body = document.createElement('div');
+      body.className = 'nt-body';
+
+      var table = document.createElement('table');
+      table.className = 'map-table';
+      table.innerHTML = '<thead><tr><th style="width:30%">Lingo Legend column</th><th>Source</th></tr></thead>';
+      var tbody = document.createElement('tbody');
+
+      OUTPUT_COLUMNS.forEach(function(col){
+        var existing = state.mappings[mid][col.key];
+        if (!existing){
+          var guessIdx = col.guess.indexOf('deck')>-1 ? -1 : guessSource(model.fields, col.guess);
+          if (col.key==='topicName'){
+            existing = {type:'deck'};
+          } else if (guessIdx>-1){
+            existing = {type:'field', field:model.fields[guessIdx]};
+          } else {
+            existing = {type:'none'};
+          }
+          state.mappings[mid][col.key] = existing;
+        }
+
+        var tr = document.createElement('tr');
+        var tdLabel = document.createElement('td');
+        tdLabel.className = 'label';
+        tdLabel.innerHTML = col.label + (col.required ? '<span class="req">*</span>' : '');
+        tr.appendChild(tdLabel);
+
+        var tdSel = document.createElement('td');
+        var sel = document.createElement('select');
+        sel.dataset.model = mid; sel.dataset.col = col.key;
+        var opts = '<option value="">— leave blank —</option>';
+        opts += '<option value="deck">Deck name</option>';
+        opts += '<option value="fixed">Fixed text…</option>';
+        opts += '<optgroup label="Anki tags">';
+        opts += '<option value="tags:all">All tags (space-separated)</option>';
+        opts += '<option value="tags:first">First tag only</option>';
+        modelTags.forEach(function(t){
+          opts += '<option value="tags:has:'+escapeHtml(t)+'">Tag: '+escapeHtml(t)+'</option>';
+        });
+        opts += '</optgroup>';
+        opts += '<optgroup label="Anki fields">';
+        model.fields.forEach(function(f,i){
+          opts += '<option value="field:'+i+'">'+escapeHtml(f)+'</option>';
+        });
+        opts += '</optgroup>';
+        sel.innerHTML = opts;
+
+        if (existing.type==='field'){
+          var idx = model.fields.indexOf(existing.field);
+          sel.value = idx>-1 ? 'field:'+idx : '';
+        } else if (existing.type==='fixed'){
+          sel.value = 'fixed';
+        } else if (existing.type==='tags'){
+          sel.value = existing.mode==='has' ? 'tags:has:'+existing.value : 'tags:'+(existing.mode||'all');
+        } else {
+          sel.value = existing.type==='none' ? '' : existing.type;
+        }
+
+        var fixedInput = document.createElement('input');
+        fixedInput.type = 'text';
+        fixedInput.className = 'fixed-input';
+        fixedInput.placeholder = 'Text to use for every row…';
+        fixedInput.hidden = existing.type!=='fixed';
+        fixedInput.value = existing.type==='fixed' ? (existing.value||'') : '';
+        fixedInput.dataset.model = mid; fixedInput.dataset.col = col.key;
+
+        sel.addEventListener('change', function(){
+          var val = sel.value;
+          var m = {type:'none'};
+          if (val==='deck') m = {type:'deck'};
+          else if (val==='fixed') m = {type:'fixed', value:fixedInput.value};
+          else if (val==='tags:all') m = {type:'tags', mode:'all'};
+          else if (val==='tags:first') m = {type:'tags', mode:'first'};
+          else if (val.indexOf('tags:has:')===0) m = {type:'tags', mode:'has', value: val.slice('tags:has:'.length)};
+          else if (val.indexOf('field:')===0) m = {type:'field', field: model.fields[parseInt(val.split(':')[1],10)]};
+          state.mappings[mid][col.key] = m;
+          fixedInput.hidden = val!=='fixed';
+        });
+        fixedInput.addEventListener('input', function(){
+          if (state.mappings[mid][col.key].type==='fixed'){
+            state.mappings[mid][col.key].value = fixedInput.value;
+          }
+        });
+
+        tdSel.appendChild(sel);
+        tdSel.appendChild(fixedInput);
+        tr.appendChild(tdSel);
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      body.appendChild(table);
+      details.appendChild(body);
+      host.appendChild(details);
+    });
+  }
+
+  /* ---------- text cleanup ---------- */
+  var scratchArea = document.createElement('textarea');
+  function decodeEntities(str){ scratchArea.innerHTML = str; return scratchArea.value; }
+
+  function cleanAnkiText(raw){
+    if (!raw) return '';
+    var t = raw;
+    t = t.replace(/\[sound:[^\]]*\]/gi, '');
+    t = t.replace(/\[\$\$?\][\s\S]*?\[\/\$\$?\]/gi, '');
+    t = t.replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/gi, '$1');
+    t = t.replace(/<br\s*\/?>/gi, ' ');
+    t = t.replace(/<\/(div|p|li|tr)>/gi, ' ');
+    t = t.replace(/<[^>]+>/g, '');
+    t = decodeEntities(t);
+    t = t.replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g,' ').trim();
+    return t;
+  }
+
+  function extractFurigana(text){
+    var readings = [];
+    var plain = text.replace(/([^\s\[\]]+)\[([^\]]+)\]/g, function(m, base, kana){
+      readings.push(kana);
+      return base;
+    });
+    return {plain:plain, reading:readings.join('')};
+  }
+
+  /* ---------- resolving rows ---------- */
+  function fieldIndexMap(model){
+    var m = {};
+    model.fields.forEach(function(name,i){ m[name]=i; });
+    return m;
+  }
+
+  function resolveValue(note, model, fim, mapping){
+    if (!mapping || mapping.type==='none') return '';
+    if (mapping.type==='fixed') return mapping.value||'';
+    if (mapping.type==='deck'){
+      var did = state.deckIdByNote[note.id];
+      return (state.decks[did] && state.decks[did].name) || '';
+    }
+    if (mapping.type==='tags'){
+      if (mapping.mode==='first') return note.tagList[0]||'';
+      if (mapping.mode==='has'){
+        var found = note.tagList.filter(function(t){ return t===mapping.value || t.indexOf(mapping.value+'::')===0; });
+        return found.join(', ');
+      }
+      return note.tagList.join(', ');
+    }
+    if (mapping.type==='field'){
+      var idx = fim[mapping.field];
+      return idx!=null ? (note.flds[idx]||'') : '';
+    }
+    return '';
+  }
+
+  function computeRawRows(){
+    var doClean = document.getElementById('optClean').checked;
+    var doFurigana = document.getElementById('optFurigana').checked;
+    var notes = includedNotes();
+    var rows = [];
+    notes.forEach(function(note){
+      var model = state.models[note.mid];
+      var mapping = state.mappings[note.mid];
+      if (!model || !mapping) return;
+      var fim = fieldIndexMap(model);
+      var row = {};
+      OUTPUT_COLUMNS.forEach(function(col){
+        var v = resolveValue(note, model, fim, mapping[col.key]);
+        row[col.key] = doClean ? cleanAnkiText(v) : (v||'').trim();
+      });
+      if (doFurigana){
+        var pronMapped = mapping.pronunciation && mapping.pronunciation.type!=='none';
+        if (!pronMapped && row.translationText && /\[[^\]]+\]/.test(row.translationText)){
+          var r1 = extractFurigana(row.translationText);
+          row.translationText = r1.plain;
+          if (!row.pronunciation) row.pronunciation = r1.reading;
+        }
+        if (!pronMapped && row.nativeText && /\[[^\]]+\]/.test(row.nativeText)){
+          var r2 = extractFurigana(row.nativeText);
+          row.nativeText = r2.plain;
+          if (!row.pronunciation) row.pronunciation = r2.reading;
+        }
+      }
+      rows.push(row);
+    });
+    return rows;
+  }
+
+  /* ---------- step 3: topic details ---------- */
+  function buildTopicsUI(){
+    var rows = computeRawRows();
+    var order = [];
+    var seen = {};
+    rows.forEach(function(r){
+      var name = r.topicName || '(untitled topic)';
+      if (!seen[name]){ seen[name]=true; order.push(name); }
+    });
+    var tbody = document.querySelector('#topicsTable tbody');
+    tbody.innerHTML = '';
+    order.forEach(function(name){
+      if (!state.topicDetails[name]) state.topicDetails[name] = {desc:'', type:''};
+      var tr = document.createElement('tr');
+      var det = state.topicDetails[name];
+      var tdName = document.createElement('td');
+      tdName.className = 'name';
+      tdName.textContent = name;
+      var tdDesc = document.createElement('td');
+      var descInput = document.createElement('input');
+      descInput.type = 'text'; descInput.value = det.desc; descInput.dataset.topic = name; descInput.dataset.field='desc';
+      tdDesc.appendChild(descInput);
+      var tdType = document.createElement('td');
+      var typeSelect = document.createElement('select');
+      typeSelect.dataset.topic = name; typeSelect.dataset.field = 'type';
+      var typeOpts = '<option value="">— leave blank —</option>';
+      TOPIC_TYPES.forEach(function(t){ typeOpts += '<option value="'+escapeHtml(t)+'">'+escapeHtml(t)+'</option>'; });
+      typeSelect.innerHTML = typeOpts;
+      typeSelect.value = TOPIC_TYPES.indexOf(det.type)>-1 ? det.type : '';
+      tdType.appendChild(typeSelect);
+      tr.appendChild(tdName); tr.appendChild(tdDesc); tr.appendChild(tdType);
+      tbody.appendChild(tr);
+    });
+    tbody.addEventListener('input', function(e){
+      var inp = e.target;
+      if (!inp.dataset.topic) return;
+      state.topicDetails[inp.dataset.topic][inp.dataset.field] = inp.value;
+    });
+    tbody.addEventListener('change', function(e){
+      var inp = e.target;
+      if (!inp.dataset.topic || inp.tagName!=='SELECT') return;
+      state.topicDetails[inp.dataset.topic][inp.dataset.field] = inp.value;
+    });
+  }
+
+  /* ---------- step 4: preview + export ---------- */
+  function csvField(v){
+    v = v==null ? '' : String(v);
+    if (/[",\n\r]/.test(v)) v = '"'+v.replace(/"/g,'""')+'"';
+    return v;
+  }
+
+  function buildFinalRows(){
+    var raw = computeRawRows();
+    // group by topic name preserving first-seen order, so desc/type only appear once per contiguous group
+    var groups = [];
+    var index = {};
+    raw.forEach(function(r){
+      var name = r.topicName || '(untitled topic)';
+      if (index[name]===undefined){
+        index[name] = groups.length;
+        groups.push({name:name, rows:[]});
+      }
+      groups[index[name]].rows.push(r);
+    });
+    var out = [];
+    groups.forEach(function(g){
+      var det = state.topicDetails[g.name] || {desc:'', type:''};
+      g.rows.forEach(function(r, i){
+        var row = Object.assign({}, r);
+        if (i===0){
+          if (det.desc) row.topicDesc = det.desc;
+          if (det.type) row.topicType = det.type;
+        } else {
+          row.topicDesc = '';
+          row.topicType = '';
+        }
+        out.push(row);
+      });
+    });
+    return out;
+  }
+
+  function buildPreview(){
+    state.rows = buildFinalRows();
+    var lines = [CSV_HEADER];
+    state.rows.forEach(function(r){
+      lines.push(OUTPUT_COLUMNS.map(function(c){ return csvField(r[c.key]); }).join(','));
+    });
+    state.csv = lines.join('\r\n');
+
+    document.getElementById('exportStats').innerHTML =
+      '<div class="stat"><div class="num">'+state.rows.length+'</div><div class="lbl">rows</div></div>'+
+      '<div class="stat"><div class="num">'+Object.keys(state.topicDetails).length+'</div><div class="lbl">topics</div></div>';
+
+    var table = document.getElementById('previewTable');
+    var thead = '<thead><tr>'+OUTPUT_COLUMNS.map(function(c){ return '<th>'+escapeHtml(c.label)+'</th>'; }).join('')+'</tr></thead>';
+    var body = '<tbody>'+state.rows.slice(0,50).map(function(r){
+      return '<tr>'+OUTPUT_COLUMNS.map(function(c){ return '<td title="'+escapeHtml(r[c.key]||'')+'">'+escapeHtml(r[c.key]||'')+'</td>'; }).join('')+'</tr>';
+    }).join('')+'</tbody>';
+    table.innerHTML = thead+body;
+  }
+
+  document.getElementById('downloadBtn').addEventListener('click', function(){
+    var blob = new Blob(["\uFEFF"+state.csv], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'lingo-legend-cards.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  /* ---------- utils ---------- */
+  function escapeHtml(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+})();
+</script>
+</body>
+</html>
