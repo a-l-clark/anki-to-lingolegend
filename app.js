@@ -883,7 +883,7 @@
       var tdHandle = document.createElement("td");
       tdHandle.className = "drag-handle-cell";
       tdHandle.innerHTML =
-        '<span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>';
+        '<span class="drag-handle" title="Drag to reorder">⠿</span>';
       tr.appendChild(tdHandle);
 
       var tdName = document.createElement("td");
@@ -924,7 +924,8 @@
 
   (function initTopicsDragDrop() {
     var tbody = document.querySelector("#topicsTable tbody");
-    var touchDragTopic = null;
+    var activePointerId = null;
+    var lastPointerY = 0;
 
     tbody.addEventListener("input", function (e) {
       var inp = e.target;
@@ -956,7 +957,7 @@
             sib.classList.remove("drag-over-top", "drag-over-bottom");
           },
         );
-        return null;
+        return;
       }
       var rect = tr.getBoundingClientRect();
       var beforeMid = lastPointerY - rect.top < rect.height / 2;
@@ -969,7 +970,6 @@
       );
       tr.classList.toggle("drag-over-top", beforeMid);
       tr.classList.toggle("drag-over-bottom", !beforeMid);
-      return beforeMid;
     }
 
     function reorderTopics(sourceTopic, targetTopic, before) {
@@ -983,37 +983,37 @@
       renderTopicsTable();
     }
 
-    var lastPointerY = 0;
-
-    /* --- mouse / native HTML5 drag-and-drop (desktop) --- */
-    tbody.addEventListener("dragstart", function (e) {
+    /* Pointer Events unify mouse, touch, and pen under one model, so the same
+       code drives desktop drag and mobile touch reordering. */
+    tbody.addEventListener("pointerdown", function (e) {
       var handle = e.target.closest(".drag-handle");
-      if (!handle) {
-        e.preventDefault();
-        return;
-      }
+      if (!handle) return;
       var tr = handle.closest("tr");
       dragSourceTopic = tr.dataset.topic;
-      e.dataTransfer.effectAllowed = "move";
+      activePointerId = e.pointerId;
+      lastPointerY = e.clientY;
       try {
-        e.dataTransfer.setData("text/plain", dragSourceTopic);
+        handle.setPointerCapture(e.pointerId);
       } catch (err) {}
       tr.classList.add("dragging");
+      e.preventDefault();
     });
 
-    tbody.addEventListener("dragover", function (e) {
-      if (!dragSourceTopic) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      lastPointerY = e.clientY;
-      var tr = e.target.closest("tr");
-      updateIndicator(tr, dragSourceTopic);
-    });
+    tbody.addEventListener(
+      "pointermove",
+      function (e) {
+        if (!dragSourceTopic || e.pointerId !== activePointerId) return;
+        e.preventDefault();
+        lastPointerY = e.clientY;
+        var tr = rowFromPoint(e.clientX, e.clientY);
+        updateIndicator(tr, dragSourceTopic);
+      },
+      { passive: false },
+    );
 
-    tbody.addEventListener("drop", function (e) {
-      if (!dragSourceTopic) return;
-      e.preventDefault();
-      var tr = e.target.closest("tr");
+    function finishDrag(e) {
+      if (!dragSourceTopic || e.pointerId !== activePointerId) return;
+      var tr = rowFromPoint(e.clientX, e.clientY);
       var targetTopic = tr ? tr.dataset.topic : null;
       var before = tr
         ? e.clientY - tr.getBoundingClientRect().top <
@@ -1022,56 +1022,13 @@
       clearDragClasses();
       reorderTopics(dragSourceTopic, targetTopic, before);
       dragSourceTopic = null;
-    });
-
-    tbody.addEventListener("dragend", function () {
+      activePointerId = null;
+    }
+    tbody.addEventListener("pointerup", finishDrag);
+    tbody.addEventListener("pointercancel", function () {
       clearDragClasses();
       dragSourceTopic = null;
-    });
-
-    /* --- touch (mobile) drag-and-drop, since HTML5 DnD isn't supported on touch --- */
-    tbody.addEventListener(
-      "touchstart",
-      function (e) {
-        var handle = e.target.closest(".drag-handle");
-        if (!handle) return;
-        var tr = handle.closest("tr");
-        touchDragTopic = tr.dataset.topic;
-        tr.classList.add("dragging");
-      },
-      { passive: true },
-    );
-
-    tbody.addEventListener(
-      "touchmove",
-      function (e) {
-        if (!touchDragTopic) return;
-        e.preventDefault(); // stop page scroll while reordering
-        var t = e.touches[0];
-        lastPointerY = t.clientY;
-        var tr = rowFromPoint(t.clientX, t.clientY);
-        updateIndicator(tr, touchDragTopic);
-      },
-      { passive: false },
-    );
-
-    tbody.addEventListener("touchend", function (e) {
-      if (!touchDragTopic) return;
-      var t = e.changedTouches[0];
-      var tr = rowFromPoint(t.clientX, t.clientY);
-      var targetTopic = tr ? tr.dataset.topic : null;
-      var before = tr
-        ? t.clientY - tr.getBoundingClientRect().top <
-          tr.getBoundingClientRect().height / 2
-        : false;
-      clearDragClasses();
-      reorderTopics(touchDragTopic, targetTopic, before);
-      touchDragTopic = null;
-    });
-
-    tbody.addEventListener("touchcancel", function () {
-      clearDragClasses();
-      touchDragTopic = null;
+      activePointerId = null;
     });
   })();
 
