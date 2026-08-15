@@ -45,6 +45,7 @@ header.top h1 {
 header.top p {
   margin: 0;
   color: var(--muted);
+  max-width: 60ch;
 }
 .tag-pill {
   display: inline-block;
@@ -62,7 +63,7 @@ header.top p {
 .steps {
   display: flex;
   gap: 6px;
-  margin-bottom: 5px;
+  margin-bottom: 26px;
   flex-wrap: wrap;
 }
 .step-tab {
@@ -331,6 +332,31 @@ details.nt-block .nt-body {
   color: var(--muted);
   font-size: 13px;
   font-style: italic;
+}
+
+.bulk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #fcfaf3;
+  border: 1px solid #ede6d2;
+  border-radius: 5px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.bulk-row label {
+  font-size: 13.6px;
+  font-weight: 600;
+}
+.bulk-row select {
+  width: auto;
+  min-width: 170px;
+  flex: 0 0 auto;
+}
+.bulk-row .btn {
+  padding: 7px 14px;
+  font-size: 13px;
 }
 input[type="checkbox"] {
   width: 16px;

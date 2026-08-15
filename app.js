@@ -573,8 +573,7 @@
       var tbody = document.createElement("tbody");
 
       OUTPUT_COLUMNS.forEach(function (col) {
-        console.log(col);
-        if (col.key === "topicDesc" || col.key === "topicType") return; // these are handled in step 3
+        if (col.key === "topicDesc" || col.key === "topicType") return; // set per-topic in the Topic Details step instead
         var existing = state.mappings[mid][col.key];
         if (!existing) {
           var guessIdx =
@@ -726,6 +725,19 @@
     return { plain: plain, reading: readings.join("") };
   }
 
+  function formatTagText(tag) {
+    if (!tag) return "";
+    return tag
+      .split("::")
+      .map(function (seg) {
+        seg = seg.replace(/[_.\-]+/g, " ");
+        seg = seg.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+        seg = seg.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
+        return seg.replace(/\s+/g, " ").trim();
+      })
+      .join(" / ");
+  }
+
   /* ---------- resolving rows ---------- */
   function fieldIndexMap(model) {
     var m = {};
@@ -735,7 +747,7 @@
     return m;
   }
 
-  function resolveValue(note, model, fim, mapping) {
+  function resolveValue(note, model, fim, mapping, doTagFormat) {
     if (!mapping || mapping.type === "none") return "";
     if (mapping.type === "fixed") return mapping.value || "";
     if (mapping.type === "deck") {
@@ -743,14 +755,20 @@
       return (state.decks[did] && state.decks[did].name) || "";
     }
     if (mapping.type === "tags") {
-      if (mapping.mode === "first") return note.tagList[0] || "";
+      var fmt = doTagFormat
+        ? formatTagText
+        : function (t) {
+            return t;
+          };
+      if (mapping.mode === "first")
+        return note.tagList[0] ? fmt(note.tagList[0]) : "";
       if (mapping.mode === "has") {
         var found = note.tagList.filter(function (t) {
           return t === mapping.value || t.indexOf(mapping.value + "::") === 0;
         });
-        return found.join(", ");
+        return found.map(fmt).join(", ");
       }
-      return note.tagList.join(", ");
+      return note.tagList.map(fmt).join(", ");
     }
     if (mapping.type === "field") {
       var idx = fim[mapping.field];
@@ -762,6 +780,7 @@
   function computeRawRows() {
     var doClean = document.getElementById("optClean").checked;
     var doFurigana = document.getElementById("optFurigana").checked;
+    var doTagFormat = document.getElementById("optTagFormat").checked;
     var notes = includedNotes();
     var rows = [];
     notes.forEach(function (note) {
@@ -771,7 +790,7 @@
       var fim = fieldIndexMap(model);
       var row = {};
       OUTPUT_COLUMNS.forEach(function (col) {
-        var v = resolveValue(note, model, fim, mapping[col.key]);
+        var v = resolveValue(note, model, fim, mapping[col.key], doTagFormat);
         row[col.key] = doClean ? cleanAnkiText(v) : (v || "").trim();
       });
       if (doFurigana) {
@@ -813,6 +832,28 @@
         order.push(name);
       }
     });
+
+    var bulkSelect = document.getElementById("bulkTopicType");
+    var bulkOpts = '<option value="">— leave blank —</option>';
+    TOPIC_TYPES.forEach(function (t) {
+      bulkOpts +=
+        '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + "</option>";
+    });
+    bulkSelect.innerHTML = bulkOpts;
+    document.getElementById("bulkApplyBtn").onclick = function () {
+      var val = bulkSelect.value;
+      order.forEach(function (name) {
+        if (!state.topicDetails[name])
+          state.topicDetails[name] = { desc: "", type: "" };
+        state.topicDetails[name].type = val;
+      });
+      document
+        .querySelectorAll('#topicsTable select[data-field="type"]')
+        .forEach(function (sel) {
+          sel.value = val;
+        });
+    };
+
     var tbody = document.querySelector("#topicsTable tbody");
     tbody.innerHTML = "";
     order.forEach(function (name) {

@@ -94,7 +94,8 @@
             Each note type gets its own mapping, since field names can differ.
             We've guessed some matches — check them over. Fields marked
             <span style="color: var(--margin)">*</span> are required by the
-            template.
+            template. Topic Description and Topic Type aren't mapped here —
+            you'll set those once per topic in the next step.
           </p>
           <div id="mappingHost"></div>
         </div>
@@ -122,6 +123,20 @@
               </div>
             </div>
           </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="optTagFormat" checked />
+            <div>
+              <div class="t-label">Make tags readable</div>
+              <div class="t-desc">
+                Applies to any column sourced from Anki tags. Replaces
+                <code>_</code>, <code>-</code>, and <code>.</code> with spaces,
+                splits <code>camelCase</code>/<code>PascalCase</code> into
+                separate words, and turns hierarchical tags like
+                <code>topic::verb_forms</code> into
+                <code>topic / verb forms</code>.
+              </div>
+            </div>
+          </div>
         </div>
         <div class="btn-row">
           <button class="btn btn-ghost" data-back>← Back</button>
@@ -139,6 +154,13 @@
             The template only fills in Description &amp; Type on the first row
             of each topic. Add them here once per topic — optional.
           </p>
+          <div class="bulk-row">
+            <label for="bulkTopicType">Set Topic Type for every row:</label>
+            <select id="bulkTopicType"></select>
+            <button class="btn btn-ghost" id="bulkApplyBtn" type="button">
+              Apply to all
+            </button>
+          </div>
           <div style="overflow: auto">
             <table class="topics-table" id="topicsTable">
               <thead>
@@ -179,13 +201,14 @@
           </button>
         </div>
       </section>
-
       <footer class="credit">
-        Runs fully client-side. Nothing about your deck is sent anywhere.
-        <br />
-        If you run into any issues, please report them on
-        <a href="https://github.com/a-l-clark/anki-to-lingolegend/issues" target="_blank"
-          >GitHub</a
+        Runs fully client-side. Nothing about your deck is sent anywhere.<br />Run
+        into a problem?
+        <a
+          href="https://github.com/a-l-clark/anki-to-lingolegend/issues"
+          target="_blank"
+          rel="noopener"
+          >Open an issue on GitHub</a
         >.
       </footer>
     </div>
