@@ -89,6 +89,7 @@
     "3 - Script",
     "4 - Misc",
   ];
+  var TRANSLATION_MAX_LEN = 70;
 
   /* ---------- state ---------- */
   var state = {
@@ -942,6 +943,31 @@
     return out;
   }
 
+  function validateRows(rows) {
+    var issues = [];
+    rows.forEach(function (r, i) {
+      var text = (r.translationText || "").trim();
+      if (!text) {
+        console.log(r);
+        console.log(i);
+        issues.push({
+          index: i + 1,
+          topicName: r.topicName || "(untitled topic)",
+          value: text,
+          reason: "Translation Text is empty",
+        });
+      } else if (text.length > TRANSLATION_MAX_LEN) {
+        issues.push({
+          index: i + 1,
+          topicName: r.topicName || "(untitled topic)",
+          value: text,
+          reason: text.length + " characters (max " + TRANSLATION_MAX_LEN + ")",
+        });
+      }
+    });
+    return issues;
+  }
+
   function buildPreview() {
     state.rows = buildFinalRows();
     var lines = [CSV_HEADER];
@@ -954,13 +980,71 @@
     });
     state.csv = lines.join("\r\n");
 
+    var issues = validateRows(state.rows);
+    state.validationIssues = issues;
+    var invalidIndex = {};
+    issues.forEach(function (iss) {
+      invalidIndex[iss.index - 1] = iss.reason;
+    });
+
     document.getElementById("exportStats").innerHTML =
       '<div class="stat"><div class="num">' +
       state.rows.length +
       '</div><div class="lbl">rows</div></div>' +
       '<div class="stat"><div class="num">' +
       Object.keys(state.topicDetails).length +
-      '</div><div class="lbl">topics</div></div>';
+      '</div><div class="lbl">topics</div></div>' +
+      '<div class="stat"><div class="num" style="' +
+      (issues.length ? "color:var(--danger)" : "") +
+      '">' +
+      issues.length +
+      '</div><div class="lbl">translation issues</div></div>';
+
+    var panel = document.getElementById("validationPanel");
+    if (!issues.length) {
+      panel.innerHTML =
+        '<div class="msg info">Translation Text looks good on every row — non-empty and 70 characters or fewer.</div>';
+    } else {
+      var shown = issues.slice(0, 15);
+      var listHtml = shown
+        .map(function (iss) {
+          return (
+            '<li><span class="vtopic">Row ' +
+            iss.index +
+            " · " +
+            escapeHtml(iss.topicName) +
+            "</span> — " +
+            '<span class="vreason">' +
+            escapeHtml(iss.reason) +
+            "</span>" +
+            (iss.value
+              ? ' <span style="color:var(--muted);">"' +
+                escapeHtml(iss.value.slice(0, 60)) +
+                (iss.value.length > 60 ? "…" : "") +
+                '"</span>'
+              : "") +
+            "</li>"
+          );
+        })
+        .join("");
+      var more =
+        issues.length > shown.length
+          ? '<li style="color:var(--muted);">…and ' +
+            (issues.length - shown.length) +
+            " more</li>"
+          : "";
+      panel.innerHTML =
+        '<div class="validation-panel"><div class="msg error">' +
+        "<strong>Translation Text needs fixing on " +
+        issues.length +
+        " row(s)</strong> before you export — it must contain text and be 70 characters or fewer. " +
+        "Go back to Map Fields (or Topic Details, if the source field itself is too long) to adjust." +
+        '<ul class="validation-list">' +
+        listHtml +
+        more +
+        "</ul>" +
+        "</div></div>";
+    }
 
     var table = document.getElementById("previewTable");
     var thead =
@@ -973,13 +1057,21 @@
       "<tbody>" +
       state.rows
         .slice(0, 50)
-        .map(function (r) {
+        .map(function (r, i) {
           return (
             "<tr>" +
             OUTPUT_COLUMNS.map(function (c) {
+              var cls =
+                c.key === "translationText" && invalidIndex[i] !== undefined
+                  ? ' class="invalid"'
+                  : "";
+              var titleExtra = cls ? " — " + escapeHtml(invalidIndex[i]) : "";
               return (
-                '<td title="' +
+                "<td" +
+                cls +
+                ' title="' +
                 escapeHtml(r[c.key] || "") +
+                titleExtra +
                 '">' +
                 escapeHtml(r[c.key] || "") +
                 "</td>"
@@ -991,9 +1083,17 @@
         .join("") +
       "</tbody>";
     table.innerHTML = thead + body;
+
+    var dlBtn = document.getElementById("downloadBtn");
+    dlBtn.disabled = issues.length > 0;
+    dlBtn.title =
+      issues.length > 0
+        ? "Fix the Translation Text issues listed above before downloading."
+        : "";
   }
 
   document.getElementById("downloadBtn").addEventListener("click", function () {
+    if (state.validationIssues && state.validationIssues.length) return;
     var blob = new Blob(["\uFEFF" + state.csv], {
       type: "text/csv;charset=utf-8;",
     });
