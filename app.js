@@ -816,6 +816,16 @@
           row.nativeText = r2.plain;
           if (!row.pronunciation) row.pronunciation = r2.reading;
         }
+        if (!pronMapped && !row.pronunciation && row.nativeText) {
+          row.pronunciation = row.nativeText;
+        }
+      }
+      if (row.pronunciation) {
+        row.pronunciation = row.pronunciation
+          .split("〜")
+          .join("")
+          .replace(/\s+/g, " ")
+          .trim();
       }
       rows.push(row);
     });

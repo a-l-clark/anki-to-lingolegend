@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Anki → Lingo Legend Card Importer</title>
 
-    <link href="google-font.css" rel="stylesheet" />
+    <link href="google-fonts.css" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -101,6 +101,10 @@
         </div>
         <div class="card">
           <h2>Text cleanup</h2>
+          <p class="hint" style="margin-bottom: 14px">
+            Pronunciation Override always has any 〜 characters stripped out,
+            regardless of the toggles below.
+          </p>
           <div class="toggle-row">
             <input type="checkbox" id="optClean" checked />
             <div>
@@ -119,7 +123,8 @@
                 If a field uses the Anki Japanese-support format
                 <code>漢字[かんじ]</code>, split the bracketed reading out into
                 <em>Pronunciation Override</em> (only for columns left unmapped)
-                and leave plain text behind.
+                and leave plain text behind. If a row has no furigana at all,
+                Native Text is used as the Pronunciation Override instead.
               </div>
             </div>
           </div>
