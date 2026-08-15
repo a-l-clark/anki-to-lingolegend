@@ -402,7 +402,7 @@ table.topics-table th {
   border-bottom: 1px solid #e7dec7;
 }
 table.topics-table th.drag-col {
-  width: 26px;
+  width: 36px;
 }
 table.topics-table td {
   padding: 6px 8px;
@@ -413,19 +413,20 @@ table.topics-table td.name {
   white-space: nowrap;
 }
 table.topics-table td.drag-handle-cell {
-  width: 26px;
-  padding: 6px 2px;
+  width: 36px;
+  padding: 2px;
   text-align: center;
 }
 .drag-handle {
   cursor: grab;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
   user-select: none;
   display: inline-block;
-  padding: 4px 6px;
+  padding: 8px 10px;
   border-radius: 4px;
+  touch-action: none;
 }
 .drag-handle:hover {
   background: #f1e9d3;
