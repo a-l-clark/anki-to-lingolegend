@@ -87,7 +87,7 @@
     "1 - Grammar",
     "2 - Phrases",
     "3 - Script",
-    "4 - Misc",
+    "4 - Mixed",
   ];
   var TRANSLATION_MAX_LEN = 70;
 
@@ -102,6 +102,7 @@
     selectedDecks: {}, // did -> bool
     mappings: {}, // mid -> { colKey: {type:'none'|'fixed'|'deck'|'tags'|'field', value, field} }
     topicDetails: {}, // topicName -> {desc, type}
+    topicOrder: [], // custom / discovered display+export order of topic names
     rows: [], // built export rows
     csv: "",
   };
@@ -822,16 +823,31 @@
   }
 
   /* ---------- step 3: topic details ---------- */
+  var dragSourceTopic = null;
+
   function buildTopicsUI() {
     var rows = computeRawRows();
-    var order = [];
-    var seen = {};
+    var discovered = [];
+    var seenName = {};
     rows.forEach(function (r) {
       var name = r.topicName || "(untitled topic)";
-      if (!seen[name]) {
-        seen[name] = true;
-        order.push(name);
+      if (!seenName[name]) {
+        seenName[name] = true;
+        discovered.push(name);
       }
+    });
+
+    if (!state.topicOrder) state.topicOrder = [];
+    var kept = state.topicOrder.filter(function (name) {
+      return seenName[name];
+    });
+    discovered.forEach(function (name) {
+      if (kept.indexOf(name) === -1) kept.push(name);
+    });
+    state.topicOrder = kept;
+    state.topicOrder.forEach(function (name) {
+      if (!state.topicDetails[name])
+        state.topicDetails[name] = { desc: "", type: "" };
     });
 
     var bulkSelect = document.getElementById("bulkTopicType");
@@ -843,9 +859,7 @@
     bulkSelect.innerHTML = bulkOpts;
     document.getElementById("bulkApplyBtn").onclick = function () {
       var val = bulkSelect.value;
-      order.forEach(function (name) {
-        if (!state.topicDetails[name])
-          state.topicDetails[name] = { desc: "", type: "" };
+      state.topicOrder.forEach(function (name) {
         state.topicDetails[name].type = val;
       });
       document
@@ -855,16 +869,28 @@
         });
     };
 
+    renderTopicsTable();
+  }
+
+  function renderTopicsTable() {
     var tbody = document.querySelector("#topicsTable tbody");
     tbody.innerHTML = "";
-    order.forEach(function (name) {
-      if (!state.topicDetails[name])
-        state.topicDetails[name] = { desc: "", type: "" };
-      var tr = document.createElement("tr");
+    state.topicOrder.forEach(function (name) {
       var det = state.topicDetails[name];
+      var tr = document.createElement("tr");
+      tr.dataset.topic = name;
+
+      var tdHandle = document.createElement("td");
+      tdHandle.className = "drag-handle-cell";
+      tdHandle.innerHTML =
+        '<span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>';
+      tr.appendChild(tdHandle);
+
       var tdName = document.createElement("td");
       tdName.className = "name";
       tdName.textContent = name;
+      tr.appendChild(tdName);
+
       var tdDesc = document.createElement("td");
       var descInput = document.createElement("input");
       descInput.type = "text";
@@ -872,6 +898,8 @@
       descInput.dataset.topic = name;
       descInput.dataset.field = "desc";
       tdDesc.appendChild(descInput);
+      tr.appendChild(tdDesc);
+
       var tdType = document.createElement("td");
       var typeSelect = document.createElement("select");
       typeSelect.dataset.topic = name;
@@ -888,11 +916,15 @@
       typeSelect.innerHTML = typeOpts;
       typeSelect.value = TOPIC_TYPES.indexOf(det.type) > -1 ? det.type : "";
       tdType.appendChild(typeSelect);
-      tr.appendChild(tdName);
-      tr.appendChild(tdDesc);
       tr.appendChild(tdType);
+
       tbody.appendChild(tr);
     });
+  }
+
+  (function initTopicsDragDrop() {
+    var tbody = document.querySelector("#topicsTable tbody");
+
     tbody.addEventListener("input", function (e) {
       var inp = e.target;
       if (!inp.dataset.topic) return;
@@ -903,7 +935,80 @@
       if (!inp.dataset.topic || inp.tagName !== "SELECT") return;
       state.topicDetails[inp.dataset.topic][inp.dataset.field] = inp.value;
     });
-  }
+
+    function clearDragClasses() {
+      Array.prototype.forEach.call(tbody.querySelectorAll("tr"), function (r) {
+        r.classList.remove("drag-over-top", "drag-over-bottom", "dragging");
+      });
+    }
+
+    tbody.addEventListener("dragstart", function (e) {
+      var handle = e.target.closest(".drag-handle");
+      if (!handle) {
+        e.preventDefault();
+        return;
+      }
+      var tr = handle.closest("tr");
+      dragSourceTopic = tr.dataset.topic;
+      e.dataTransfer.effectAllowed = "move";
+      try {
+        e.dataTransfer.setData("text/plain", dragSourceTopic);
+      } catch (err) {}
+      tr.classList.add("dragging");
+    });
+
+    tbody.addEventListener("dragover", function (e) {
+      if (!dragSourceTopic) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      var tr = e.target.closest("tr");
+      if (!tr || tr.dataset.topic === dragSourceTopic) return;
+      var rect = tr.getBoundingClientRect();
+      var before = e.clientY - rect.top < rect.height / 2;
+      Array.prototype.forEach.call(
+        tbody.querySelectorAll("tr"),
+        function (sib) {
+          if (sib !== tr)
+            sib.classList.remove("drag-over-top", "drag-over-bottom");
+        },
+      );
+      tr.classList.toggle("drag-over-top", before);
+      tr.classList.toggle("drag-over-bottom", !before);
+    });
+
+    tbody.addEventListener("drop", function (e) {
+      if (!dragSourceTopic) return;
+      e.preventDefault();
+      var tr = e.target.closest("tr");
+      var targetTopic = tr ? tr.dataset.topic : null;
+      var before = false;
+      if (tr) {
+        var rect = tr.getBoundingClientRect();
+        before = e.clientY - rect.top < rect.height / 2;
+      }
+      clearDragClasses();
+      if (!targetTopic || targetTopic === dragSourceTopic) {
+        dragSourceTopic = null;
+        return;
+      }
+      var fromIdx = state.topicOrder.indexOf(dragSourceTopic);
+      if (fromIdx === -1) {
+        dragSourceTopic = null;
+        return;
+      }
+      state.topicOrder.splice(fromIdx, 1);
+      var toIdx = state.topicOrder.indexOf(targetTopic);
+      var insertAt = before ? toIdx : toIdx + 1;
+      state.topicOrder.splice(insertAt, 0, dragSourceTopic);
+      dragSourceTopic = null;
+      renderTopicsTable();
+    });
+
+    tbody.addEventListener("dragend", function () {
+      clearDragClasses();
+      dragSourceTopic = null;
+    });
+  })();
 
   /* ---------- step 4: preview + export ---------- */
   function csvField(v) {
@@ -914,21 +1019,32 @@
 
   function buildFinalRows() {
     var raw = computeRawRows();
-    // group by topic name preserving first-seen order, so desc/type only appear once per contiguous group
-    var groups = [];
-    var index = {};
+    // group by topic name, ordered per the user's custom topic order (falls back to first-seen order)
+    var byName = {};
+    var discoveredOrder = [];
     raw.forEach(function (r) {
       var name = r.topicName || "(untitled topic)";
-      if (index[name] === undefined) {
-        index[name] = groups.length;
-        groups.push({ name: name, rows: [] });
+      if (!byName[name]) {
+        byName[name] = [];
+        discoveredOrder.push(name);
       }
-      groups[index[name]].rows.push(r);
+      byName[name].push(r);
     });
+    var order =
+      state.topicOrder && state.topicOrder.length
+        ? state.topicOrder.slice()
+        : discoveredOrder;
+    discoveredOrder.forEach(function (name) {
+      if (order.indexOf(name) === -1) order.push(name);
+    });
+    order = order.filter(function (name) {
+      return byName[name];
+    });
+
     var out = [];
-    groups.forEach(function (g) {
-      var det = state.topicDetails[g.name] || { desc: "", type: "" };
-      g.rows.forEach(function (r, i) {
+    order.forEach(function (name) {
+      var det = state.topicDetails[name] || { desc: "", type: "" };
+      byName[name].forEach(function (r, i) {
         var row = Object.assign({}, r);
         if (i === 0) {
           if (det.desc) row.topicDesc = det.desc;
@@ -948,8 +1064,6 @@
     rows.forEach(function (r, i) {
       var text = (r.translationText || "").trim();
       if (!text) {
-        console.log(r);
-        console.log(i);
         issues.push({
           index: i + 1,
           topicName: r.topicName || "(untitled topic)",

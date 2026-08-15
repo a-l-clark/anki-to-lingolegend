@@ -401,6 +401,9 @@ table.topics-table th {
   padding: 6px 8px;
   border-bottom: 1px solid #e7dec7;
 }
+table.topics-table th.drag-col {
+  width: 26px;
+}
 table.topics-table td {
   padding: 6px 8px;
   border-bottom: 1px solid #f0eada;
@@ -408,6 +411,37 @@ table.topics-table td {
 table.topics-table td.name {
   font-weight: 600;
   white-space: nowrap;
+}
+table.topics-table td.drag-handle-cell {
+  width: 26px;
+  padding: 6px 2px;
+  text-align: center;
+}
+.drag-handle {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  user-select: none;
+  display: inline-block;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.drag-handle:hover {
+  background: #f1e9d3;
+  color: var(--ink);
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+table.topics-table tr.dragging {
+  opacity: 0.35;
+}
+table.topics-table tr.drag-over-top td {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+table.topics-table tr.drag-over-bottom td {
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .preview-wrap {
