@@ -101,6 +101,7 @@
     selectedModels: {}, // mid -> bool
     selectedDecks: {}, // did -> bool
     mappings: {}, // mid -> { colKey: {type:'none'|'fixed'|'deck'|'tags'|'field', value, field} }
+    savedPronunciation: {}, // mid -> mapping stashed away while furigana extraction is locking the field
     topicDetails: {}, // topicName -> {desc, type}
     topicOrder: [], // custom / discovered display+export order of topic names
     rows: [], // built export rows
@@ -689,7 +690,79 @@
       details.appendChild(body);
       host.appendChild(details);
     });
+
+    applyFuriganaLock();
   }
+
+  function setSelectValueFromMapping(sel, model, mapping) {
+    if (!mapping) {
+      sel.value = "";
+      return;
+    }
+    if (mapping.type === "field") {
+      var idx = model.fields.indexOf(mapping.field);
+      sel.value = idx > -1 ? "field:" + idx : "";
+    } else if (mapping.type === "fixed") {
+      sel.value = "fixed";
+    } else if (mapping.type === "tags") {
+      sel.value =
+        mapping.mode === "has"
+          ? "tags:has:" + mapping.value
+          : "tags:" + (mapping.mode || "all");
+    } else {
+      sel.value = mapping.type === "none" ? "" : mapping.type;
+    }
+  }
+
+  function applyFuriganaLock() {
+    var locked = document.getElementById("optFurigana").checked;
+    document
+      .querySelectorAll('select[data-col="pronunciation"]')
+      .forEach(function (sel) {
+        var mid = sel.dataset.model;
+        var model = state.models[mid];
+        var fixedInput = document.querySelector(
+          'input.fixed-input[data-col="pronunciation"][data-model="' +
+            mid +
+            '"]',
+        );
+        if (locked) {
+          if (
+            state.mappings[mid].pronunciation &&
+            state.mappings[mid].pronunciation.type !== "none"
+          ) {
+            state.savedPronunciation[mid] = state.mappings[mid].pronunciation;
+          }
+          state.mappings[mid].pronunciation = { type: "none" };
+          sel.value = "";
+          sel.disabled = true;
+          sel.title =
+            'Controlled by "Extract furigana readings" below — uncheck it to map this manually.';
+          if (fixedInput) {
+            fixedInput.hidden = true;
+            fixedInput.disabled = true;
+          }
+        } else {
+          sel.disabled = false;
+          sel.title = "";
+          if (fixedInput) fixedInput.disabled = false;
+          var restored = state.savedPronunciation[mid];
+          if (restored) {
+            state.mappings[mid].pronunciation = restored;
+            delete state.savedPronunciation[mid];
+            setSelectValueFromMapping(sel, model, restored);
+            if (fixedInput) {
+              fixedInput.hidden = restored.type !== "fixed";
+              fixedInput.value =
+                restored.type === "fixed" ? restored.value || "" : "";
+            }
+          }
+        }
+      });
+  }
+  document
+    .getElementById("optFurigana")
+    .addEventListener("change", applyFuriganaLock);
 
   /* ---------- text cleanup ---------- */
   var scratchArea = document.createElement("textarea");
@@ -796,29 +869,19 @@
         row[col.key] = doClean ? cleanAnkiText(v) : (v || "").trim();
       });
       if (doFurigana) {
-        var pronMapped =
-          mapping.pronunciation && mapping.pronunciation.type !== "none";
-        if (
-          !pronMapped &&
-          row.translationText &&
-          /\[[^\]]+\]/.test(row.translationText)
-        ) {
+        var pronVal = "";
+        if (row.translationText && /\[[^\]]+\]/.test(row.translationText)) {
           var r1 = extractFurigana(row.translationText);
           row.translationText = r1.plain;
-          if (!row.pronunciation) row.pronunciation = r1.reading;
+          if (r1.reading) pronVal = r1.reading;
         }
-        if (
-          !pronMapped &&
-          row.nativeText &&
-          /\[[^\]]+\]/.test(row.nativeText)
-        ) {
+        if (row.nativeText && /\[[^\]]+\]/.test(row.nativeText)) {
           var r2 = extractFurigana(row.nativeText);
           row.nativeText = r2.plain;
-          if (!row.pronunciation) row.pronunciation = r2.reading;
+          if (!pronVal && r2.reading) pronVal = r2.reading;
         }
-        if (!pronMapped && !row.pronunciation && row.nativeText) {
-          row.pronunciation = row.nativeText;
-        }
+        if (!pronVal && row.nativeText) pronVal = row.nativeText;
+        row.pronunciation = pronVal;
       }
       if (row.pronunciation) {
         row.pronunciation = row.pronunciation

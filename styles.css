@@ -248,6 +248,12 @@ input[type="text"]:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+select:disabled,
+input[type="text"]:disabled {
+  background: #f1ede0;
+  color: var(--muted);
+  cursor: not-allowed;
+}
 .fixed-input {
   margin-top: 5px;
 }
