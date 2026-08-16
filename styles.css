@@ -232,6 +232,10 @@ table.map-table td.label .req {
   color: var(--margin);
   margin-left: 3px;
 }
+table.map-table td.label .label-text {
+  cursor: help;
+  border-bottom: 1px dotted var(--muted);
+}
 select,
 input[type="text"] {
   font-family: "Inter", sans-serif;

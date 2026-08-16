@@ -16,6 +16,29 @@
       label: "Native Text",
       required: true,
       guess: [
+        "back",
+        "answer",
+        "meaning",
+        "translation",
+        "target",
+        "definition",
+      ],
+    },
+    {
+      key: "nativeContext",
+      label: "Native Context Line",
+      required: false,
+      guess: [
+        "example (translation)",
+        "translated example",
+        "translation example",
+      ],
+    },
+    {
+      key: "translationText",
+      label: "Translation Text",
+      required: true,
+      guess: [
         "front",
         "word",
         "term",
@@ -26,8 +49,8 @@
       ],
     },
     {
-      key: "nativeContext",
-      label: "Native Context Line",
+      key: "translationContext",
+      label: "Translation Context Line",
       required: false,
       guess: [
         "example (native)",
@@ -35,29 +58,6 @@
         "context",
         "example sentence",
         "example",
-      ],
-    },
-    {
-      key: "translationText",
-      label: "Translation Text",
-      required: true,
-      guess: [
-        "back",
-        "answer",
-        "meaning",
-        "translation",
-        "target",
-        "definition",
-      ],
-    },
-    {
-      key: "translationContext",
-      label: "Translation Context Line",
-      required: false,
-      guess: [
-        "example (translation)",
-        "translated example",
-        "translation example",
       ],
     },
     {
@@ -101,7 +101,6 @@
     selectedModels: {}, // mid -> bool
     selectedDecks: {}, // did -> bool
     mappings: {}, // mid -> { colKey: {type:'none'|'fixed'|'deck'|'tags'|'field', value, field} }
-    savedPronunciation: {}, // mid -> mapping stashed away while furigana extraction is locking the field
     topicDetails: {}, // topicName -> {desc, type}
     topicOrder: [], // custom / discovered display+export order of topic names
     rows: [], // built export rows
@@ -596,8 +595,20 @@
         var tr = document.createElement("tr");
         var tdLabel = document.createElement("td");
         tdLabel.className = "label";
+        var guessTip =
+          col.key === "topicName"
+            ? "Defaults to the deck name — change it in the dropdown if you'd rather use a field or tag."
+            : col.guess.length
+              ? "Auto-matched against field names containing: " +
+                col.guess.join(", ")
+              : "No auto-matching for this column — choose a source manually.";
         tdLabel.innerHTML =
-          col.label + (col.required ? '<span class="req">*</span>' : "");
+          '<span class="label-text" title="' +
+          escapeHtml(guessTip) +
+          '">' +
+          escapeHtml(col.label) +
+          (col.required ? '<span class="req">*</span>' : "") +
+          "</span>";
         tr.appendChild(tdLabel);
 
         var tdSel = document.createElement("td");
@@ -690,79 +701,7 @@
       details.appendChild(body);
       host.appendChild(details);
     });
-
-    applyFuriganaLock();
   }
-
-  function setSelectValueFromMapping(sel, model, mapping) {
-    if (!mapping) {
-      sel.value = "";
-      return;
-    }
-    if (mapping.type === "field") {
-      var idx = model.fields.indexOf(mapping.field);
-      sel.value = idx > -1 ? "field:" + idx : "";
-    } else if (mapping.type === "fixed") {
-      sel.value = "fixed";
-    } else if (mapping.type === "tags") {
-      sel.value =
-        mapping.mode === "has"
-          ? "tags:has:" + mapping.value
-          : "tags:" + (mapping.mode || "all");
-    } else {
-      sel.value = mapping.type === "none" ? "" : mapping.type;
-    }
-  }
-
-  function applyFuriganaLock() {
-    var locked = document.getElementById("optFurigana").checked;
-    document
-      .querySelectorAll('select[data-col="pronunciation"]')
-      .forEach(function (sel) {
-        var mid = sel.dataset.model;
-        var model = state.models[mid];
-        var fixedInput = document.querySelector(
-          'input.fixed-input[data-col="pronunciation"][data-model="' +
-            mid +
-            '"]',
-        );
-        if (locked) {
-          if (
-            state.mappings[mid].pronunciation &&
-            state.mappings[mid].pronunciation.type !== "none"
-          ) {
-            state.savedPronunciation[mid] = state.mappings[mid].pronunciation;
-          }
-          state.mappings[mid].pronunciation = { type: "none" };
-          sel.value = "";
-          sel.disabled = true;
-          sel.title =
-            'Controlled by "Extract furigana readings" below — uncheck it to map this manually.';
-          if (fixedInput) {
-            fixedInput.hidden = true;
-            fixedInput.disabled = true;
-          }
-        } else {
-          sel.disabled = false;
-          sel.title = "";
-          if (fixedInput) fixedInput.disabled = false;
-          var restored = state.savedPronunciation[mid];
-          if (restored) {
-            state.mappings[mid].pronunciation = restored;
-            delete state.savedPronunciation[mid];
-            setSelectValueFromMapping(sel, model, restored);
-            if (fixedInput) {
-              fixedInput.hidden = restored.type !== "fixed";
-              fixedInput.value =
-                restored.type === "fixed" ? restored.value || "" : "";
-            }
-          }
-        }
-      });
-  }
-  document
-    .getElementById("optFurigana")
-    .addEventListener("change", applyFuriganaLock);
 
   /* ---------- text cleanup ---------- */
   var scratchArea = document.createElement("textarea");
@@ -868,20 +807,13 @@
         var v = resolveValue(note, model, fim, mapping[col.key], doTagFormat);
         row[col.key] = doClean ? cleanAnkiText(v) : (v || "").trim();
       });
-      if (doFurigana) {
-        var pronVal = "";
-        if (row.translationText && /\[[^\]]+\]/.test(row.translationText)) {
-          var r1 = extractFurigana(row.translationText);
-          row.translationText = r1.plain;
-          if (r1.reading) pronVal = r1.reading;
-        }
-        if (row.nativeText && /\[[^\]]+\]/.test(row.nativeText)) {
-          var r2 = extractFurigana(row.nativeText);
-          row.nativeText = r2.plain;
-          if (!pronVal && r2.reading) pronVal = r2.reading;
-        }
-        if (!pronVal && row.nativeText) pronVal = row.nativeText;
-        row.pronunciation = pronVal;
+      if (
+        doFurigana &&
+        row.pronunciation &&
+        /\[[^\]]+\]/.test(row.pronunciation)
+      ) {
+        var pr = extractFurigana(row.pronunciation);
+        if (pr.reading) row.pronunciation = pr.reading;
       }
       if (row.pronunciation) {
         row.pronunciation = row.pronunciation
